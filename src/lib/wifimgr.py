@@ -3,8 +3,8 @@ import socket
 import ure
 import time
 
-ap_ssid = "SWSWTR"
-ap_password = "SWSWTR123"
+ap_ssid = "WifiManager"
+ap_password = "tayfunulu"
 ap_authmode = 3  # WPA2
 
 NETWORK_PROFILES = 'wifi.dat'
@@ -13,6 +13,7 @@ wlan_ap = network.WLAN(network.AP_IF)
 wlan_sta = network.WLAN(network.STA_IF)
 
 server_socket = None
+
 
 def get_connection():
     """return a working WLAN(STA_IF) instance or None"""
@@ -45,12 +46,9 @@ def get_connection():
                     password = profiles[ssid]
                     connected = do_connect(ssid, password)
                 else:
-                    print("Skipping unknown encrypted network...")
+                    print("skipping unknown encrypted network")
             else:  # open
-                if ssid in profiles:
-                    connected = do_connect(ssid, None)
-                else:
-                    print("Skipping unknown open network...")
+                connected = do_connect(ssid, None)
             if connected:
                 break
 
@@ -125,7 +123,7 @@ def handle_root(client):
         <html>
             <h1 style="color: #5e9ca0; text-align: center;">
                 <span style="color: #ff0000;">
-                    SWSWTR Wi-Fi Client Setup
+                    Wi-Fi Client Setup
                 </span>
             </h1>
             <form action="configure" method="post">
@@ -157,11 +155,24 @@ def handle_root(client):
             <h5>
                 <span style="color: #ff0000;">
                     Your ssid and password information will be saved into the
-                    "%(filename)s" file on your module for future usage.
+                    "%(filename)s" file in your ESP module for future usage.
                     Be careful about security!
                 </span>
             </h5>
             <hr />
+            <h2 style="color: #2e6c80;">
+                Some useful infos:
+            </h2>
+            <ul>
+                <li>
+                    Original code from <a href="https://github.com/cpopp/MicroPythonSamples"
+                        target="_blank" rel="noopener">cpopp/MicroPythonSamples</a>.
+                </li>
+                <li>
+                    This code available at <a href="https://github.com/tayfunulu/WiFiManager"
+                        target="_blank" rel="noopener">tayfunulu/WiFiManager</a>.
+                </li>
+            </ul>
         </html>
     """ % dict(filename=NETWORK_PROFILES))
     client.close()
@@ -175,11 +186,11 @@ def handle_configure(client, request):
         return False
     # version 1.9 compatibility
     try:
-        ssid = match.group(1).decode("utf-8").replace("%3F", "?").replace("%21", "!").replace("%2F", "/").replace("%20", " ").replace("%20", " ").replace("%26", "&")
-        password = match.group(2).decode("utf-8").replace("%3F", "?").replace("%21", "!").replace("%2F", "/").replace("%20", " ")
+        ssid = match.group(1).decode("utf-8").replace("%3F", "?").replace("%21", "!")
+        password = match.group(2).decode("utf-8").replace("%3F", "?").replace("%21", "!")
     except Exception:
-        ssid = match.group(1).replace("%3F", "?").replace("%21", "!").replace("%2F", "/").replace("%20", " ").replace("%26", "&")
-        password = match.group(2).replace("%3F", "?").replace("%21", "!").replace("%2F", "/").replace("%20", " ")
+        ssid = match.group(1).replace("%3F", "?").replace("%21", "!")
+        password = match.group(2).replace("%3F", "?").replace("%21", "!")
 
     if len(ssid) == 0:
         send_response(client, "SSID must be provided", status_code=400)
@@ -287,7 +298,7 @@ def start(port=80):
                 url = ure.search("(?:GET|POST) /(.*?)(?:\\?.*?)? HTTP", request).group(1).decode("utf-8").rstrip("/")
             except Exception:
                 url = ure.search("(?:GET|POST) /(.*?)(?:\\?.*?)? HTTP", request).group(1).rstrip("/")
-            #print("URL is {}".format(url))
+            print("URL is {}".format(url))
 
             if url == "":
                 handle_root(client)
