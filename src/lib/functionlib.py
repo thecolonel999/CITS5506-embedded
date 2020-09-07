@@ -40,7 +40,7 @@ def save_config(CONFIG):
         print("Couldn't save config.json")
 
 def map_values(x, in_min, in_max, out_min, out_max):
-    return (x - in_min)*(out_max - out_min)/(in_max - in_min) + out_min;
+    return (x - in_min)*(out_max - out_min)/(in_max - in_min) + out_min
 
 def readBME280(CONFIG):
     import gc
@@ -63,7 +63,7 @@ def readBME280(CONFIG):
         humidity = bme.humidity # Humidity in % relative humidity
         pressure = bme.pressure # Pressure in Pa
 
-    return [temperature, humidity, pressure];
+    return [temperature, humidity, pressure]
 
 def readDS18B20(CONFIG):
     import gc
@@ -83,7 +83,7 @@ def readDS18B20(CONFIG):
     else:
         soilTemperature = ds_sensor.read_temp(rom)
     
-    return soilTemperature;
+    return soilTemperature
 
 def readMoistureSensor(CONFIG):
     import gc
@@ -101,7 +101,7 @@ def readMoistureSensor(CONFIG):
     elif moisture < 0:
         moisture = 0
 
-    return moisture;
+    return moisture
 
 def readRainSensor(CONFIG):
     import gc
@@ -116,7 +116,7 @@ def readRainSensor(CONFIG):
     else:
         io.setup(CONFIG['RAIN_SENSOR_IO_EXPANDER_PIN'], mcp.IN)
         rain = io.input(CONFIG['RAIN_SENSOR_IO_EXPANDER_PIN']) # Boolean true/false
-    return rain;
+    return rain
 
 def set_NTP_Time():
     import gc
@@ -134,13 +134,22 @@ def set_NTP_Time():
         else:
             print("RTC updated from NTP server.")
 
+def get_time():
+    from machine import RTC
+    rtc = RTC()
+    (year, month, day, _, hours, minutes, seconds, milliseconds) = rtc.datetime()
+    # Time takes the form YYYY-MM-DD'T'HH:MM:SS.MSS
+    timestring = "%04d" % year + "-" + "%02d" % month + "-" + "%02d" % day + "T" + "%02d" % hours + ":" + "%02d" % minutes + ":" + "%02d" % seconds + "." + "%03d" % milliseconds
+
+    return timestring
+
 def read_sensors(data, CONFIG):
     samples = CONFIG['SAMPLES_TO_BE_AVERAGED']
 
     air_temperature = humidity = pressure = soil_temperature = moisture = 0
 
     # Read our sensors multiple times
-    for i in range(1,samples):
+    for i in range(0,samples):
         [t, h, p] = readBME280(CONFIG)
         air_temperature += t
         humidity += h
@@ -159,7 +168,28 @@ def read_sensors(data, CONFIG):
     # Read boolean values
     data.rain = readRainSensor(CONFIG)
 
+    # Get the current time and return in standard format
+    data.time = get_time()
+
     print("Sensor Data Collected.")
+
+def send_over_mqtt(data, CONFIG):
+    from umqtt.simple import MQTTClient
+    client = MQTTClient(CONFIG['unique_id'], CONFIG['mqtt_server_ip'])
+    try:
+        client.connect()
+    except:
+        print("Could not connect to mqtt broker!")
+    else:
+        mqtt_client.publish(CONFIG['unique_id'] + "_soil_temperature", data.soil_temperature)
+        mqtt_client.publish(CONFIG['unique_id'] + "_soil_moisture", data.soil_moisture)
+        mqtt_client.publish(CONFIG['unique_id'] + "_air_temperature", data.air_temperature)
+        mqtt_client.publish(CONFIG['unique_id'] + "_humidity", data.humidity)
+        mqtt_client.publish(CONFIG['unique_id'] + "_pressure", data.pressure)
+        mqtt_client.publish(CONFIG['unique_id'] + "_rain", data.rain)
+        mqtt_client.publish(CONFIG['unique_id'] + "_time", data.time)
+        client.disconnect()
 
 def sensor_poll_and_transmit(data, CONFIG):
     read_sensors(data, CONFIG)
+    send_over_mqtt(data, CONFIG)

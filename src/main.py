@@ -9,7 +9,7 @@ import machine
 from machine import Timer
 import wifimgr
 import ubinascii
-#import umqttsimple
+from umqtt.simple import MQTTClient
 try:
     import usocket as socket
 except:
@@ -34,7 +34,8 @@ CONFIG = {
     "SAMPLES_TO_BE_AVERAGED": 10,
     "unique_id": ubinascii.hexlify(machine.unique_id()),
     "client_name": b"SWSWTR_"+ubinascii.hexlify(machine.unique_id()).decode('utf-8'),
-    "topic": b"home"
+    "mqtt_server_ip": b"192.168.5.1",
+    "API-key": "************"
 }
 
 save_config(CONFIG) # Save config for now
