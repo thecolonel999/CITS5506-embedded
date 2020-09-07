@@ -144,6 +144,9 @@ def get_time():
     return timestring
 
 def read_sensors(data, CONFIG):
+    import gc
+    gc.collect()
+
     samples = CONFIG['SAMPLES_TO_BE_AVERAGED']
 
     air_temperature = humidity = pressure = soil_temperature = moisture = 0
@@ -175,6 +178,9 @@ def read_sensors(data, CONFIG):
 
 def send_over_mqtt(data, CONFIG):
     from umqtt.simple import MQTTClient
+    import gc
+    gc.collect()
+
     client = MQTTClient(CONFIG['unique_id'], CONFIG['mqtt_server_ip'])
     try:
         client.connect()
