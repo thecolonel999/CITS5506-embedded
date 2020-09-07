@@ -186,7 +186,7 @@ def send_over_mqtt(data, CONFIG):
         mqtt_client.publish(CONFIG['unique_id'] + "_air_temperature", data.air_temperature)
         mqtt_client.publish(CONFIG['unique_id'] + "_humidity", data.humidity)
         mqtt_client.publish(CONFIG['unique_id'] + "_pressure", data.pressure)
-        mqtt_client.publish(CONFIG['unique_id'] + "_rain", data.rain)
+        mqtt_client.publish(CONFIG['unique_id'] + "_rain", int(data.rain == 'true')
         mqtt_client.publish(CONFIG['unique_id'] + "_time", data.time)
         mqtt_client.publish(CONFIG['unique_id'] + "_station1_watering", int(data.station1_watering == 'true'))
         mqtt_client.publish(CONFIG['unique_id'] + "_station2_watering", int(data.station2_watering == 'true'))
