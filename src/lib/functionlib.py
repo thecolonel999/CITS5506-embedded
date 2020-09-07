@@ -188,6 +188,11 @@ def send_over_mqtt(data, CONFIG):
         mqtt_client.publish(CONFIG['unique_id'] + "_pressure", data.pressure)
         mqtt_client.publish(CONFIG['unique_id'] + "_rain", data.rain)
         mqtt_client.publish(CONFIG['unique_id'] + "_time", data.time)
+        mqtt_client.publish(CONFIG['unique_id'] + "_station1_watering", int(data.station1_watering == 'true'))
+        mqtt_client.publish(CONFIG['unique_id'] + "_station2_watering", int(data.station2_watering == 'true'))
+        mqtt_client.publish(CONFIG['unique_id'] + "_station3_watering", int(data.station3_watering == 'true'))
+        mqtt_client.publish(CONFIG['unique_id'] + "_station4_watering", int(data.station4_watering == 'true'))
+
         client.disconnect()
 
 def sensor_poll_and_transmit(data, CONFIG):
