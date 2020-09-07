@@ -9,7 +9,6 @@ import machine
 from machine import Timer
 import wifimgr
 import ubinascii
-from umqtt.simple import MQTTClient
 try:
     import usocket as socket
 except:
