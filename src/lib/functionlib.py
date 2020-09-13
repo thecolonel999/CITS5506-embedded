@@ -3,7 +3,7 @@
 
 # Class for storing our data, initialise all lists as empty
 class Data:
-    def __init__(self, empty_list = []):
+    def __init__(self, empty_list = 0):
         self.soil_temperature = empty_list
         self.soil_moisture = empty_list
         self.air_temperature = empty_list
@@ -241,7 +241,7 @@ def sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG):
     read_sensors(data, CONFIG, WATER_CONFIG)
     send_over_mqtt(data, CONFIG)
 
-def check_relays(CONFIG, WATER_CONFIG):
+def check_relays(data, CONFIG, WATER_CONFIG):
     # First get the date and time
     import gc
     gc.collect()
@@ -313,13 +313,13 @@ def check_relays(CONFIG, WATER_CONFIG):
             duration = WATER_CONFIG['FRI_DURATION']
             water = WATER_CONFIG['FRI_WATER']
         elif weekday == 5:
-            start_time = WATER_CONFIG['FRI_START']
-            duration = WATER_CONFIG['FRI_DURATION']
-            water = WATER_CONFIG['FRI_WATER']
+            start_time = WATER_CONFIG['SAT_START']
+            duration = WATER_CONFIG['SAT_DURATION']
+            water = WATER_CONFIG['SAT_WATER']
         elif weekday == 6:
-            start_time = WATER_CONFIG['FRI_START']
-            duration = WATER_CONFIG['FRI_DURATION']
-            water = WATER_CONFIG['FRI_WATER']
+            start_time = WATER_CONFIG['SUN_START']
+            duration = WATER_CONFIG['SUN_DURATION']
+            water = WATER_CONFIG['SUN_WATER']
         
         duration_secs = duration*60
 
@@ -330,20 +330,37 @@ def check_relays(CONFIG, WATER_CONFIG):
         now_ref = utime.mktime((2000, 0, 0, hour, minute, second, 0, 0))
 
         # Find the programmed time relative to the same reference point
-        water_start_time = utime.mktime((2000, 0, 0, int(start_time), int(start_time*60)%60, 0, 0, 0))
+        water_start_time = utime.mktime((2000, 0, 0, int(start_time), int(start_time*60)%60 + 1, 0, 0, 0))
 
         # Next check if we need to activate the relays. There are 7 days that we need to check
+        i = 0
         for pin in pins:
-            
+            i = i + 1
             if (water == True) & (now_ref > water_start_time) & (now_ref < (water_start_time + duration_secs)):
                 print("Watering station # " + str(pin))
                 LED_BUILTIN.value(0)
+                if i == 1:
+                    data.station1_watering = True
+                elif i == 2:
+                    data.station2_watering = True
+                elif i == 3:
+                    data.station3_watering = True
+                elif i == 4:
+                    data.station4_watering = True
                 try:
                     io.output(pin, True)
                 except:
                     pass
             else:
                 LED_BUILTIN.value(1)
+                if i == 1:
+                    data.station1_watering = False
+                elif i == 2:
+                    data.station2_watering = False
+                elif i == 3:
+                    data.station3_watering = False
+                elif i == 4:
+                    data.station4_watering = False
                 try:
                     io.output(pin, False)
                 except:
@@ -352,3 +369,68 @@ def check_relays(CONFIG, WATER_CONFIG):
             # Apply a funky offset that basically runs through the stations in sequence
             water_start_time = water_start_time + duration_secs
         return
+
+def display_OLED(oled, data, CONFIG):
+    # Start with blank screen
+    oled.fill(0)
+
+    # First make sure we show the local time in the first row
+    import gc
+    gc.collect()
+    import utime
+    gc.collect()
+    
+    now = utime.mktime(utime.localtime()) # Get the current time (in UTC number of seconds)
+    now = now + CONFIG['TIMEZONE']*60*60 # Apply time-zone correction
+    (year, month, day, hour, minute, second, _, _) = utime.localtime(now) # Extract the time
+
+    #oled.text(str(hour) + ':' + str(minute) + ':' + str(second), 30, 0)
+    oled.text('%02d:%02d:%02d' % (hour, minute, second), 30, 0)
+
+    # Now work out which screen we should display
+    s_remainder = int(now % (CONFIG['OLED_CYCLE_S']*CONFIG['OLED_NUMBER_OF_SCREENS']))
+    counter = int(s_remainder/CONFIG['OLED_CYCLE_S'])
+
+    # Next check our cases and respond accordingly
+    if counter == 0: # First screen shows Air conditions
+        oled.text('T: %.2fC' % data.air_temperature, 0, 16)
+        oled.text('H: %.2f%%' % data.humidity, 0, 32)
+        oled.text('P: %.1fhPa' % data.pressure, 0, 48)
+
+    elif counter == 1: # Second screen shows soil conditions
+        oled.text('Soil T: %.2fC' % data.soil_temperature, 0, 16)
+        oled.text('Moist:  %.2f%%' % data.soil_moisture, 0, 32)
+        if data.rain == 1:
+            buf = 'True'
+        else:
+            buf = 'False'
+        oled.text('Rain:   ' + buf, 0, 48)
+    
+    elif counter == 2: # Third screen shows watering data
+        if data.station1_watering == True or data.station2_watering == True or data.station3_watering == True or data.station4_watering == True:
+            oled.text('Watering: True', 0, 16)
+            if data.station1_watering == True:
+                oled.text('Station:  1', 0, 32)
+            elif data.station2_watering == True:
+                oled.text('Station:  2', 0, 32)
+            elif data.station3_watering == True:
+                oled.text('Station:  3', 0, 32)
+            elif data.station4_watering == True:
+                oled.text('Station:  4', 0, 32)
+        else:
+            oled.text('Watering: False', 0, 16)
+    
+    elif counter == 3: # Fourth screen shows key network info
+        import gc
+        gc.collect()
+        import network
+        gc.collect()
+
+        (IP, _, _, _) = network.WLAN(network.STA_IF).ifconfig()
+
+        oled.text(str(CONFIG['SSID']), 0, 16)
+        oled.text(str(IP), 0, 32)
+        oled.text('%02d/%02d/%04d' % (day, month, year), 0, 48)
+    
+    # Finally, push the update to our display
+    oled.show()
