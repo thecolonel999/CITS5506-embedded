@@ -27,6 +27,8 @@ except:
 gc.collect()
 from time import sleep
 gc.collect()
+import ssd1306
+gc.collect()
 
 # Config dictionary
 # These defaults are overwritten with the contents of config.json by load_config()
@@ -64,26 +66,26 @@ CONFIG = {
 WATER_CONFIG = {
     "LAST_RAIN": 0,
     "RAIN_LOOKBACK": 3,
-    "MON_START": 6,
-    "MON_DURATION": 10,
+    "MON_START": 13.1666666,
+    "MON_DURATION": 1,
     "MON_WATER": True,
-    "TUE_START": 6,
-    "TUE_DURATION": 10,
+    "TUE_START": 13.1666666,
+    "TUE_DURATION": 1,
     "TUE_WATER": True,
-    "WED_START": 6,
-    "WED_DURATION": 10,
+    "WED_START": 13.1666666,
+    "WED_DURATION": 1,
     "WED_WATER": True,
-    "THU_START": 6,
-    "THU_DURATION": 10,
+    "THU_START": 13.1666666,
+    "THU_DURATION": 1,
     "THU_WATER": True,
-    "FRI_START": 15.5,
-    "FRI_DURATION": 10,
+    "FRI_START": 13.1666666,
+    "FRI_DURATION": 1,
     "FRI_WATER": True,
-    "SAT_START": 6,
-    "SAT_DURATION": 10,
+    "SAT_START": 13.1666666,
+    "SAT_DURATION": 1,
     "SAT_WATER": True,
-    "SUN_START": 6,
-    "SUN_DURATION": 10,
+    "SUN_START": 13.5333333,
+    "SUN_DURATION": 1,
     "SUN_WATER": True,
 }
 
@@ -95,7 +97,12 @@ load_config(WATER_CONFIG, 'water_config.json') # Save config for now
 
 data = Data() # Create object data from class Data
 
-# Set up output pins
+# Set up OLED display
+i2c = machine.I2C(scl=machine.Pin(CONFIG['SCL_PIN']), sda=machine.Pin(CONFIG['SDA_PIN']))
+oled = ssd1306.SSD1306_I2C(128,64, i2c)
+oled.fill(0) # Start with blank screen
+oled.text('SWSWTR', 40, 0)
+oled.show()
 
 # First try to connect to the previously stored WiFi network
 sta_if = network.WLAN(network.STA_IF)
@@ -123,6 +130,9 @@ if not sta_if.isconnected():
 # Once we get to here, we have connected to a network.
 # Disable the AP interface
 network.WLAN(network.AP_IF).active(False)
+oled.text('CONNECTING TO:', 0, 16)
+oled.text(CONFIG['SSID'], 0, 32)
+oled.show()
 
 while network.WLAN(network.STA_IF).isconnected() == False:
     pass
@@ -132,11 +142,38 @@ if network.WLAN(network.STA_IF).isconnected():
 # Initial NTP Server stuff
 set_NTP_Time()
 
-# Initialise Timer(s)
-tim1 = Timer(-1)
-tim2 = Timer(-1)
-tim3 = Timer(-1)
+# Initial reading of sensors (consider this our 'initial conditions')
+sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG)
 
-tim1.init(period=60000, mode=Timer.PERIODIC, callback=lambda t:set_NTP_Time()) # Periodic update of NTP server every minute
-tim2.init(period=CONFIG['SAMPLE_PERIOD_S']*1000, mode=Timer.PERIODIC, callback=lambda t:sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG)) # Periodic sensor reading and data transmission
-tim3.init(period=1000, mode=Timer.PERIODIC, callback = lambda t:check_relays(CONFIG, WATER_CONFIG)) # Periodic checking of our relays
+# Initialise Timer(s)
+tim1 = Timer(-1) # for NTP server updating
+gc.collect()
+tim2 = Timer(-1) # for data collection
+gc.collect()
+tim3 = Timer(-1) # for data transmittal over MQTT
+gc.collect()
+tim4 = Timer(-1) # for updating our display
+gc.collect()
+
+# Periodic update of NTP server every minute
+tim1.init(period=60000, mode=Timer.PERIODIC, callback=lambda t:set_NTP_Time())
+gc.collect()
+
+# Periodic sensor reading and data transmission
+tim2.init(period=CONFIG['SAMPLE_PERIOD_S']*1000, mode=Timer.PERIODIC, callback=lambda t:sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG))
+gc.collect()
+
+# Periodic checking of our relays
+tim3.init(period=1000, mode=Timer.PERIODIC, callback = lambda t:check_relays(data, CONFIG, WATER_CONFIG))
+gc.collect()
+
+# Counter flag for cycling automatically through our various displays
+# We have 4 displays that we want to cycle through:
+# 1. Show Air Temp, Humidity, Pressure
+# 2. Show Soil Temp, Soil Moisture and Rainfall
+# 3. Show if a watering station is active
+# 4. Show network SSID, IP Address and current date
+
+# Periodic updating of our display
+tim4.init(period=int(1000/(CONFIG['OLED_FPS'])), mode=Timer.PERIODIC, callback=lambda t:display_OLED(oled, data, CONFIG))
+gc.collect()
