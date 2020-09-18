@@ -192,14 +192,14 @@ def read_sensors(data, CONFIG, WATER_CONFIG):
     data.air_temperature = air_temperature/samples
     data.humidity = humidity/samples
     data.pressure = pressure/samples
-    data.moisture = moisture/samples
+    data.soil_moisture = moisture/samples
 
     print("") # Blank line for neatness
     print("Air Temperature: " + str(data.air_temperature) + "C")
     print("Humidity: " + str(data.humidity) + "%")
     print("Atmospheric Pressure: " + str(data.pressure) + "hPa")
     print("Soil Temperature: " + str(data.soil_temperature) + "C")
-    print("Soil Moisture Level: " + str(data.moisture) + "%")
+    print("Soil Moisture Level: " + str(data.soil_moisture) + "%")
 
     # Read boolean values
     data.rain = readRainSensor(CONFIG, WATER_CONFIG)
@@ -237,9 +237,43 @@ def send_over_mqtt(data, CONFIG):
 
         mqtt_client.disconnect()
 
+def send_over_http(data, CONFIG):
+    import gc
+    gc.collect()
+    import urequests
+    gc.collect()
+
+    # Create our base url string
+    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID'])
+    
+    # Now send our packets of data
+    # First create an array of subsequent urls
+    urls = [
+        "&type=temperature&value=" + str(data.air_temperature),
+        "&type=pressure&value=" + str(data.pressure),
+        "&type=humidity&value=" + str(data.humidity),
+        "&type=soil%20temp&value=" + str(data.soil_temperature),
+        "&type=soil%20moisture%20level&value=" + str(data.soil_moisture),
+        "&type=rain%20sensing&value=" + str(data.rain),
+        "&type=time&value=" + str(data.time)
+    ]
+
+    gc.collect()
+
+    # Iterate to send our data packets
+    for url in urls:
+        try:
+            response = urequests.post(baseurl + url)
+        except:
+            print("Unable to complete HTTP POST request!")
+            pass
+        response.close()
+        gc.collect()
+
 def sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG):
     read_sensors(data, CONFIG, WATER_CONFIG)
-    send_over_mqtt(data, CONFIG)
+    #send_over_mqtt(data, CONFIG)
+    send_over_http(data, CONFIG)
 
 def check_relays(CONFIG, WATER_CONFIG):
     # First get the date and time
