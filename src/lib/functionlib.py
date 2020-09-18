@@ -244,7 +244,7 @@ def send_over_http(data, CONFIG):
     gc.collect()
 
     # Create our base url string
-    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID'])
+    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID']) + "&timestamp=" + data.time
     
     # Now send our packets of data
     # First create an array of subsequent urls
@@ -254,8 +254,7 @@ def send_over_http(data, CONFIG):
         "&type=humidity&value=" + str(data.humidity),
         "&type=soil%20temp&value=" + str(data.soil_temperature),
         "&type=soil%20moisture%20level&value=" + str(data.soil_moisture),
-        "&type=rain%20sensing&value=" + str(data.rain),
-        "&type=time&value=" + str(data.time)
+        "&type=rain%20sensing&value=" + str(data.rain)
     ]
 
     gc.collect()
