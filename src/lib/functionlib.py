@@ -75,6 +75,8 @@ def readBME280(CONFIG):
 def readDS18B20(CONFIG):
     import gc
     gc.collect()
+    from time import sleep_ms
+    gc.collect()
 
     # Note this function assumes only 1 temp sensor is attached via one-wire
     import machine, onewire, ds18x20
@@ -84,11 +86,12 @@ def readDS18B20(CONFIG):
 
     try:
         ds_sensor.convert_temp()
+        sleep_ms(250)
     except:
         print("ERROR: DS18B20 OneWire")
         soilTemperature = -255 # Temperature in celcius
     else:
-        soilTemperature = ds_sensor.read_temp(rom)
+        soilTemperature = ds_sensor.read_temp(rom[0])
     
     return soilTemperature
 
@@ -184,7 +187,6 @@ def read_sensors(data, CONFIG, WATER_CONFIG):
         humidity += h
         pressure += p
 
-        soil_temperature += readDS18B20(CONFIG)
         moisture += readMoistureSensor(CONFIG)
     
     # Now store the average value
@@ -193,6 +195,9 @@ def read_sensors(data, CONFIG, WATER_CONFIG):
     data.humidity = humidity/samples
     data.pressure = pressure/samples
     data.soil_moisture = moisture/samples
+
+    # Now read our soil moisture sensor
+    data.soil_temperature = readDS18B20(CONFIG)
 
     print("") # Blank line for neatness
     print("Air Temperature: " + str(data.air_temperature) + "C")
@@ -211,32 +216,6 @@ def read_sensors(data, CONFIG, WATER_CONFIG):
 
     print("Sensor Data Collected.")
 
-def send_over_mqtt(data, CONFIG):
-    import gc
-    gc.collect()
-    from umqtt.simple import MQTTClient
-    gc.collect()
-
-    mqtt_client = MQTTClient(CONFIG['UNIQUE_ID'], CONFIG['MQTT_SERVER_IP'])
-    try:
-        mqtt_client.connect()
-    except:
-        print("Could not connect to mqtt broker!")
-    else:
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "soil_temperature=" + str(data.soil_temperature))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "soil_moisture=" + str(data.soil_moisture))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "air_temperature=" + str(data.air_temperature))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "humidity=" + str(data.humidity))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "pressure=" + str(data.pressure))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "rain=" + str(data.rain))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "time=" + str(data.time))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "station1_watering=" + str(int(data.station1_watering == 'true')))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "station2_watering=" + str(int(data.station2_watering == 'true')))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "station3_watering=" + str(int(data.station3_watering == 'true')))
-        mqtt_client.publish(CONFIG['UNIQUE_ID'], "station4_watering=" + str(int(data.station4_watering == 'true')))
-
-        mqtt_client.disconnect()
-
 def send_over_http(data, CONFIG):
     import gc
     gc.collect()
@@ -244,7 +223,7 @@ def send_over_http(data, CONFIG):
     gc.collect()
 
     # Create our base url string
-    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID']) + "&timestamp=" + data.time
+    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID']) + "&token=" + str(CONFIG['TOKEN']).replace('+','%2B') + "&timestamp=" + str(data.time)
     
     # Now send our packets of data
     # First create an array of subsequent urls
@@ -257,6 +236,8 @@ def send_over_http(data, CONFIG):
         "&type=rain%20sensing&value=" + str(data.rain)
     ]
 
+    print(baseurl + urls[0])
+
     gc.collect()
 
     # Iterate to send our data packets
@@ -266,8 +247,25 @@ def send_over_http(data, CONFIG):
         except:
             print("Unable to complete HTTP POST request!")
             pass
-        response.close()
+        else:
+            response.close()
         gc.collect()
+    
+    # Now send our data packet for watering
+    baseurl = "http://" + str(CONFIG['HTTP_SERVER_IP'], 'utf-8') + ":" + str(CONFIG['HTTP_PORT']) + "/device/watering/?userid=" + str(CONFIG['USERNAME'], 'utf-8') + "&device_id=" + str(CONFIG['UNIQUE_ID']) + "&token=" + str(CONFIG['TOKEN']).replace('+','%2B') + "&timestamp=" + str(data.time)
+    url = "&relay_output_1=" + str(int(data.station1_watering == True)) + "&relay_output_2=" + str(int(data.station2_watering == True)) + "&relay_output_3=" + str(int(data.station3_watering == True)) + "&relay_output_4=" + str(int(data.station4_watering == True))
+
+    print(baseurl + url)
+
+    try:
+        response = urequests.post(baseurl + url)
+    except:
+        print("Unable to complete HTTP POST request!")
+        pass
+    else:
+        response.close()
+    gc.collect()
+    
 
 def sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG):
     read_sensors(data, CONFIG, WATER_CONFIG)
@@ -305,9 +303,10 @@ def check_relays(data, CONFIG, WATER_CONFIG):
             except:
                 pass
         
-        # If we've had rain then set all outputs to low
-        if current_day - last_rain < WATER_CONFIG['RAIN_LOOKBACK']:
+        # If we've had rain OR our soil moisture is high then set all outputs to low
+        if current_day - last_rain < WATER_CONFIG['RAIN_LOOKBACK'] or data.soil_moisture < WATER_CONFIG['SOIL_MOISTURE_THRESHOLD_PERCENT']:
             print("Rain in past " + str(WATER_CONFIG['RAIN_LOOKBACK']) + " days, skipping watering...")
+            print("Soil Moisture Level is " + str(data.soil_moisture) + "%")
             for pin in pins:
                 try:
                     io.output(pin, False)
