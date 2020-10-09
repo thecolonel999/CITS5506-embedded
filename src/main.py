@@ -38,28 +38,29 @@ CONFIG = {
     "SCL_PIN": 4,
     "ONEWIRE_PIN": 0,
     "MOISTURE_PIN": 0,
-    "MOISTURE_SENSOR_AIR_VALUE": 620,
-    "MOISTURE_SENSOR_WATER_VALUE": 310,
+    "MOISTURE_SENSOR_AIR_VALUE": 1024,
+    "MOISTURE_SENSOR_WATER_VALUE": 522,
     "RAIN_SENSOR_IO_EXPANDER_PIN": 0,
     "RELAY_1_IO_EXPANDER_PIN": 1,
     "RELAY_2_IO_EXPANDER_PIN": 2,
     "RELAY_3_IO_EXPANDER_PIN": 3,
     "RELAY_4_IO_EXPANDER_PIN": 4,
-    "SAMPLE_PERIOD_S": 30,
-    "SAMPLES_TO_BE_AVERAGED": 10,
+    "SAMPLE_PERIOD_S": 60,
+    "SAMPLES_TO_BE_AVERAGED": 5,
     "RAIN_LOOKBACK": 3,
     "OLED_FPS": 15,
     "OLED_CYCLE_S": 5,
     "OLED_NUMBER_OF_SCREENS": 4,
     #"UNIQUE_ID": ubinascii.hexlify(machine.unique_id()),
     "UNIQUE_ID": 3,
-    "CLIENT_NAME": b"SWSWTR_"+ubinascii.hexlify(machine.unique_id()).decode('utf-8'),
+    "CLIENT_NAME": b"SWS_"+ubinascii.hexlify(machine.unique_id()).decode('utf-8'),
+    "TOKEN": b"SpuuHArl+iPP97SpAMEfo+wMpIxMe+mGM84YqkIY9wwW8Ghx9mvxU+hHQqgKbVtH",
     "USERNAME": b"admin@sws.net.au",
     #"MQTT_SERVER_IP": b"192.168.1.83",
-    "HTTP_SERVER_IP": b"192.168.1.83",
+    "HTTP_SERVER_IP": b"192.168.1.86",
     "HTTP_PORT": 4000,
-    "TEMP_AP_SSID": b"SWSWTR",
-    #"SSID": b"SWSWTR-AP",
+    "TEMP_AP_SSID": b"SWS",
+    #"SSID": b"SWS-AP",
     #"PASSKEY": b"123456789"
     "SSID": b"Dave & Jess",
     "PASSKEY": b"January18",
@@ -69,6 +70,7 @@ CONFIG = {
 WATER_CONFIG = {
     "LAST_RAIN": 0,
     "RAIN_LOOKBACK": 3,
+    "SOIL_MOISTURE_THRESHOLD_PERCENT": 60,
     "MON_START": 13.1666666,
     "MON_DURATION": 1,
     "MON_WATER": True,
@@ -104,7 +106,7 @@ data = Data() # Create object data from class Data
 i2c = machine.I2C(scl=machine.Pin(CONFIG['SCL_PIN']), sda=machine.Pin(CONFIG['SDA_PIN']))
 oled = ssd1306.SSD1306_I2C(128,64, i2c)
 oled.fill(0) # Start with blank screen
-oled.text('SWSWTR', 40, 0)
+oled.text('SWS', 70, 0)
 oled.show()
 
 # First try to connect to the previously stored WiFi network
@@ -146,7 +148,7 @@ if network.WLAN(network.STA_IF).isconnected():
 set_NTP_Time()
 
 # Initial reading of sensors (consider this our 'initial conditions')
-sensor_poll_and_transmit(data, CONFIG, WATER_CONFIG)
+read_sensors(data, CONFIG, WATER_CONFIG)
 
 # Initialise Timer(s)
 tim1 = Timer(-1) # for NTP server updating
